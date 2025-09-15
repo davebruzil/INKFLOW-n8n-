@@ -1,6 +1,6 @@
 # 🎨 INKFLOW - AI-Powered WhatsApp Bot for Tattoo Artists
 
-![Netflix Clone Screenshot](01-Netflix-Clone-Screenshot.png)
+![INKFLOW n8n Workflow](00-INKFLOW-Workflow.png)
 
 ![Tattoo Studio Automation](https://img.shields.io/badge/Tattoo-Automation-purple) ![n8n Workflow](https://img.shields.io/badge/n8n-Workflow-blue) ![WhatsApp Bot](https://img.shields.io/badge/WhatsApp-Bot-green)
 
