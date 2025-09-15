@@ -197,19 +197,6 @@ Currently optimized for Hebrew, but easily adaptable for:
 - **Documentation**: Full setup guides in Wiki
 - **Community**: Join our tattoo artist automation community
 
-## 🤝 Contributing
+# License
 
-1. Fork the repository
-2. Create feature branch
-3. Test with your studio setup
-4. Submit pull request
-
-## 📄 License
-
-MIT License - free for commercial use in tattoo studios
-
----
-
-**Made for tattoo artists, by automation enthusiasts** 🎨🤖
-
-*Transform your client consultations from manual WhatsApp chats to an intelligent, automated system that never sleeps.*
+Proprietary - Commercial use only with written permission
