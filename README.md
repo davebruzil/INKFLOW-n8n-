@@ -1,12 +1,10 @@
 # 🎨 INKFLOW - AI-Powered WhatsApp Bot for Tattoo Artists
 
-![INKFLOW n8n Workflow](00-INKFLOW-Workflow.png)
-
 ![Tattoo Studio Automation](https://img.shields.io/badge/Tattoo-Automation-purple) ![n8n Workflow](https://img.shields.io/badge/n8n-Workflow-blue) ![WhatsApp Bot](https://img.shields.io/badge/WhatsApp-Bot-green)
 
 ## 📱 What is INKFLOW?
 
-INKFLOW is a complete WhatsApp automation system designed specifically for tattoo artists and studios. It uses AI to handle client consultations, gather tattoo ideas, collect client information, and manage the entire pre-booking process automatically through WhatsApp.
+INKFLOW is a complete WhatsApp automation system designed specifically for tattoo artists and studios. It uses AI to handle client consultations, gather tattoo ideas, collect client information, and manage the entire pre-booking process automatically through WhatsApp.nono
 
 ## 🌟 Key Features
 
@@ -199,6 +197,19 @@ Currently optimized for Hebrew, but easily adaptable for:
 - **Documentation**: Full setup guides in Wiki
 - **Community**: Join our tattoo artist automation community
 
-# License
+## 🤝 Contributing
 
-Proprietary - Commercial use only with written permission
+1. Fork the repository
+2. Create feature branch
+3. Test with your studio setup
+4. Submit pull request
+
+## 📄 License
+
+MIT License - free for commercial use in tattoo studios
+
+---
+
+**Made for tattoo artists, by automation enthusiasts** 🎨🤖
+
+*Transform your client consultations from manual WhatsApp chats to an intelligent, automated system that never sleeps.*
