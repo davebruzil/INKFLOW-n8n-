@@ -221,7 +221,6 @@
     {
       "parameters": {
         "operation": "update",
-        "database": "inkflow_crm",
         "collection": "clients",
         "updateKey": "phone_number",
         "fields": "name,phone_number,meeting_type,idea_summary,ai_active,session_id,conversation_length,platform,timestamp,created_at,updated_at,error_details,raw_response",
@@ -260,7 +259,6 @@
     {
       "parameters": {
         "operation": "find",
-        "database": "inkflow_crm",
         "collection": "clients",
         "options": {},
         "query": "={{ JSON.stringify({ phone_number: $json.senderPhone.replace(/\\D/g, '') }) }}"
@@ -545,7 +543,6 @@
     {
       "parameters": {
         "operation": "find",
-        "database": "inkflow_crm",
         "collection": "clients",
         "options": {
           "limit": 1
@@ -584,7 +581,6 @@
     {
       "parameters": {
         "operation": "update",
-        "database": "inkflow_crm",
         "collection": "clients",
         "updateKey": "phone_number",
         "fields": "phone_number,session_id,images,image_count,has_images,last_image_upload,updated_at,created_at,name,idea_summary,meeting_type,conversation_length,ai_active,platform,timestamp,raw_response",
@@ -746,7 +742,6 @@
     {
       "parameters": {
         "operation": "find",
-        "database": "inkflow_crm",
         "collection": "clients",
         "options": "={{ { limit: 1, sort: { updated_at: -1 } } }}",
         "query": "={{ JSON.stringify({ phone_number: $json.phone_number }) }}"
