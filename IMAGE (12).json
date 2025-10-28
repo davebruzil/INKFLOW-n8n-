@@ -450,7 +450,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CRITICAL FIX: Merge Image Customer Data Node\n// The issue was using $node[\"Extract Image Metadata\"] which doesn't pass data through the chain\n// SOLUTION: Use $node syntax to get Extract Image Metadata, but current $json for image URL\n\nconst inputItem = $input.first();\nconst imageUrl = inputItem.json.publicUrl;\n\n// CRITICAL: Get customer data from Extract Image Metadata node directly\nconst customerData = $node[\"Extract Image Metadata\"].json;\n\nconsole.log('🔗 Merging customer data with image URL');\nconsole.log('📦 customerData:', customerData);\nconsole.log('📞 customerData.senderPhone:', customerData.senderPhone);\nconsole.log('🖼️  imageUrl:', imageUrl);\nconsole.log('📦 Has binary data:', !!inputItem.binary);\n\n// VALIDATION: Ensure we have the phone number\nif (!customerData || !customerData.senderPhone) {\n  console.error('❌ CRITICAL: customerData is missing or has no senderPhone!');\n  console.error('Available customerData:', JSON.stringify(customerData, null, 2));\n  // Try to recover from input if customerData is broken\n  if (inputItem.json.senderPhone) {\n    console.log('⚠️ Attempting to use senderPhone from input item');\n  }\n}\n\nconst output = {\n  ...customerData,\n  publicUrl: imageUrl,\n  imageDecrypted: true\n};\n\nconsole.log('✅ Output senderPhone:', output.senderPhone);\nconsole.log('✅ Output sessionId:', output.sessionId);\nconsole.log('✅ Output keys:', Object.keys(output));\n\n// CRITICAL: Return both JSON and BINARY data\nreturn [{\n  json: output,\n  binary: inputItem.binary || {}  // Pass through binary data for AI vision\n}];"
+        "jsCode": "// CRITICAL FIX: Merge Image Customer Data Node\n// The issue was using $node[\"Extract Image Metadata\"] which doesn't pass data through the chain\n// SOLUTION: Use $node syntax to get Extract Image Metadata, but current $json for image URL\n\nconst inputItem = $input.first();\nconst imageUrl = inputItem.json.publicUrl;\n\n// CRITICAL: Get customer data from Extract Image Metadata node directly\nconst customerData = $node[\"Extract Image Metadata\"].json;\n\nconsole.log('🔗 Merging customer data with image URL');\nconsole.log('📦 customerData:', customerData);\nconsole.log('📞 customerData.senderPhone:', customerData.senderPhone);\nconsole.log('🖼️  imageUrl:', imageUrl);\nconsole.log('📦 Has binary data:', !!inputItem.binary);\n\n// VALIDATION: Ensure we have the phone number\nif (!customerData || !customerData.senderPhone) {\n  console.error('❌ CRITICAL: customerData is missing or has no senderPhone!');\n  console.error('Available customerData:', JSON.stringify(customerData, null, 2));\n  // Try to recover from input if customerData is broken\n  if (inputItem.json.senderPhone) {\n    console.log('⚠️ Attempting to use senderPhone from input item');\n  }\n}\n\nconst output = {\n  ...customerData,\n  publicUrl: imageUrl,\n  imageDecrypted: true\n};\n\nconsole.log('✅ Output senderPhone:', output.senderPhone);\nconsole.log('✅ Output sessionId:', output.sessionId);\nconsole.log('✅ Output keys:', Object.keys(output));\n\n// FIX: Prevent race condition - process images sequentially per user\nconst phoneNumber = output.senderPhone;\nconst staticData = $getWorkflowStaticData('global');\n\nif (!staticData.imageProcessing) {\n  staticData.imageProcessing = {};\n}\n\n// Wait if another image is being processed for this user\nlet waitCount = 0;\nwhile (staticData.imageProcessing[phoneNumber] && waitCount < 50) {\n  // Wait 100ms and check again (max 5 seconds total)\n  await new Promise(resolve => setTimeout(resolve, 100));\n  waitCount++;\n}\n\nif (waitCount >= 50) {\n  console.error('⚠️ Image processing timeout - forcing through');\n}\n\n// Lock processing for this user\nstaticData.imageProcessing[phoneNumber] = true;\nconsole.log('🔒 Locked image processing for:', phoneNumber);\n\n// Unlock after 3 seconds\nsetTimeout(() => {\n  delete staticData.imageProcessing[phoneNumber];\n  console.log('🔓 Unlocked image processing for:', phoneNumber);\n}, 3000);\n\n// CRITICAL: Return both JSON and BINARY data\nreturn [{\n  json: output,\n  binary: inputItem.binary || {}  // Pass through binary data for AI vision\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -613,6 +613,19 @@
       ],
       "id": "5cbd84d8-b20c-474a-8d45-0660a34acca8",
       "name": "CONVO"
+    },
+    {
+      "parameters": {
+        "jsCode": "// BATCH VISION AI - Smart batching for multiple images with AI vision\n// Waits 5 seconds after first image to batch multiple images together\n\nconst inputItem = $input.first();\nconst sessionId = inputItem.json.sessionId;\nconst senderPhone = inputItem.json.senderPhone;\nconst imageUrl = inputItem.json.publicUrl;\nconst chatInput = inputItem.json.chatInput || '';\n\nconsole.log('📸 Batch Vision AI - Processing image');\nconsole.log('👤 Session:', sessionId);\n\nconst staticData = $getWorkflowStaticData('global');\n\nif (!staticData.imageBatches) {\n  staticData.imageBatches = {};\n}\n\nconst now = Date.now();\nconst BATCH_WINDOW = 5000; // 5 seconds to collect images\n\nif (!staticData.imageBatches[sessionId]) {\n  staticData.imageBatches[sessionId] = {\n    images: [],\n    firstImageTime: now,\n    count: 0\n  };\n}\n\nconst batch = staticData.imageBatches[sessionId];\nconst timeSinceFirst = now - batch.firstImageTime;\n\n// Add this image to batch\nbatch.images.push({\n  url: imageUrl,\n  caption: chatInput,\n  timestamp: now,\n  binary: inputItem.binary,\n  senderJID: inputItem.json.senderJID\n});\nbatch.count++;\n\nconsole.log(`📊 Image ${batch.count}, ${timeSinceFirst}ms since first`);\n\n// CRITICAL: Block images 2-4 from processing\nif (batch.count > 1 && timeSinceFirst < BATCH_WINDOW) {\n  console.log(`⛔ BLOCKING image ${batch.count} - already batched`);\n  return []; // Stop this execution completely!\n}\n\n// This is the FIRST image - wait for more\nif (batch.count === 1) {\n  console.log('⏳ First image - waiting 5 seconds for more...');\n  \n  // Wait 5 seconds for batch\n  await new Promise(resolve => setTimeout(resolve, BATCH_WINDOW));\n  \n  console.log(`🚀 Batch complete - processing ${batch.count} images`);\n}\n\n// Get final batch\nconst finalBatch = staticData.imageBatches[sessionId];\nconst allImages = finalBatch.images;\nconst imageCount = allImages.length;\n\n// Clean up batch\ndelete staticData.imageBatches[sessionId];\n\nif (imageCount === 1) {\n  // Single image - normal AI call\n  console.log('🤖 Single image - AI will analyze');\n  \n  return [{\n    json: {\n      ...inputItem.json,\n      imageCount: 1,\n      batchedImages: false\n    },\n    binary: inputItem.binary\n  }];\n  \n} else {\n  // Multiple images - batch response\n  console.log(`📸 ${imageCount} images - AI will acknowledge batch`);\n  \n  const batchCaption = allImages.map((img, i) => \n    `תמונה ${i + 1}${img.caption ? ': ' + img.caption : ''}`\n  ).join('\\n');\n  \n  return [{\n    json: {\n      ...inputItem.json,\n      chatInput: `קיבלתי ${imageCount} תמונות! תודה 📸\\n\\n${batchCaption}\\n\\nהעברתי את כולן למקעקעת והיא תחזור אליך בהקדם.`,\n      imageCount: imageCount,\n      batchedImages: true,\n      skipAIAnalysis: true,  // Tell AI not to analyze, just acknowledge\n      allImageUrls: allImages.map(img => img.url)\n    },\n    binary: allImages[0].binary\n  }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1496,
+        -208
+      ],
+      "id": "batch-vision-ai-12345",
+      "name": "Batch Vision AI"
     },
     {
       "parameters": {
@@ -993,6 +1006,17 @@
             "type": "main",
             "index": 0
           },
+          {
+            "node": "Batch Vision AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Vision AI": {
+      "main": [
+        [
           {
             "node": "AI Agent1",
             "type": "main",
