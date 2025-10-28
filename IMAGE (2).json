@@ -1,0 +1,970 @@
+{
+  "name": "IMAGE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1776,
+        128
+      ],
+      "id": "b25ebf77-858d-4e76-804c-ae4d4ad2efd5",
+      "name": "WhatsApp Webhook Receiver",
+      "webhookId": "e0348897-9433-457d-8cd5-8c80663857a7"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "sessionId"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -576,
+        288
+      ],
+      "id": "4e5578f1-e976-4dff-ac88-6259032f3d86",
+      "name": "Agent Memory"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced detection for WhatsApp conversations\nconst aiResponse = $json.output || $json.response || $json.text || '';\nlet whatsappData;\ntry {\n    // For text messages - reference the Code node\n    whatsappData = $node[\"Code\"].json;\n} catch (error) {\n    // For images - use input data\n    whatsappData = $input.first().json;\n}\nconsole.log('🤖 AI Response:', aiResponse);\nconsole.log('📱 WhatsApp Data:', whatsappData);\n\nlet shouldTriggerSummary = false;\nlet extractedName = '';\nlet triggerReason = '';\nlet foundCompletions = [];\n\ntry {\n  // Get user input from WhatsApp data\n  const userInput = whatsappData.chatInput || '';\n  const senderPhone = whatsappData.senderPhone || '';\n  const senderName = whatsappData.senderName || '';\n\n  console.log('👤 User Input:', userInput);\n  console.log('📞 Sender Phone:', senderPhone);\n  console.log('👤 Sender Name:', senderName);\n\n  // Extract name from user input first\n  if (userInput) {\n    const userNamePatterns = [\n      /(?:אני|קוראים לי|השם שלי|שמי)\\s+([א-ת]{2,15})/i,\n      /^([א-ת]{2,10})$/,\n      /היי.*?אני\\s+([א-ת]{2,15})/i\n    ];\n\n    for (const pattern of userNamePatterns) {\n      const match = userInput.match(pattern);\n      if (match && match[1]) {\n        const candidate = match[1].trim();\n        const excludeWords = ['רוצה', 'צריך', 'מעוניין', 'חושב', 'טוב', 'יפה'];\n        if (!excludeWords.includes(candidate)) {\n          extractedName = candidate;\n          console.log('✅ Name from user input:', extractedName);\n          break;\n        }\n      }\n    }\n  }\n\n  // Extract name from AI response if not found in user input\n  if (!extractedName && aiResponse) {\n    const thankPattern = /תודה\\s+([א-ת]{2,15})/i;\n    const thankMatch = aiResponse.match(thankPattern);\n    if (thankMatch && thankMatch[1]) {\n      extractedName = thankMatch[1];\n      console.log('✅ Name from \"תודה [שם]\" pattern:', extractedName);\n    }\n    \n    if (!extractedName) {\n      const greetingPattern = /(?:מושלם|נעים|סבבה),?\\s+([א-ת]{2,15})/i;\n      const greetingMatch = aiResponse.match(greetingPattern);\n      if (greetingMatch && greetingMatch[1]) {\n        extractedName = greetingMatch[1];\n        console.log('✅ Name from greeting pattern:', extractedName);\n      }\n    }\n  }\n\n  // Check for completion indicators\n  const completionPhrases = [\n    'תודה',\n    'מושלם', \n    'מעולה',\n    'נחזור אליך',\n    'אעביר למקעקעת',\n    'נקבע לך',\n    'ניצור קשר',\n    'נתאם',\n    'את הפרטים שלך',\n    'בהקדם'\n  ];\n\n  foundCompletions = completionPhrases.filter(phrase => aiResponse.includes(phrase));\n  console.log('✅ Completion phrases found:', foundCompletions);\n\n  // Decision logic\n  if (extractedName && foundCompletions.length > 0) {\n    shouldTriggerSummary = true;\n    triggerReason = `Name \"${extractedName}\" + ${foundCompletions.length} completion phrases: ${foundCompletions.join(', ')}`;\n  } else if (foundCompletions.length >= 2) {\n    shouldTriggerSummary = true;\n    triggerReason = `Strong completion indicators (${foundCompletions.length}): ${foundCompletions.join(', ')}`;\n  } else if (extractedName && aiResponse.includes('תודה')) {\n    shouldTriggerSummary = true;\n    triggerReason = `AI thanking user \"${extractedName}\"`;\n  } else {\n    triggerReason = `Insufficient indicators - Name: \"${extractedName}\", Completions: ${foundCompletions.length}`;\n  }\n\n  console.log('📊 FINAL DECISION:');\n  console.log('  Name:', extractedName || 'None');\n  console.log('  Trigger:', shouldTriggerSummary);\n  console.log('  Reason:', triggerReason);\n\n} catch (error) {\n  console.error('❌ Error:', error.message);\n  shouldTriggerSummary = false;\n  triggerReason = 'Error occurred: ' + error.message;\n  foundCompletions = [];\n}\n\nreturn [{\n  json: {\n    output: aiResponse,\n    response: aiResponse,\n    text: aiResponse,\n    shouldTriggerSummary: shouldTriggerSummary,\n    extractedName: extractedName,\n    triggerReason: triggerReason,\n    senderPhone: whatsappData.senderPhone,\n    senderName: whatsappData.senderName,\n    debug: {\n      foundCompletions: foundCompletions || [],\n      hasName: !!extractedName,\n      completionCount: (foundCompletions || []).length\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        128
+      ],
+      "id": "35d86563-5a2a-425c-9771-9fdf1dda94df",
+      "name": "Process AI Response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_TOKEN_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $('Code').item.json.to }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -32,
+        288
+      ],
+      "id": "50f76263-dd7c-4b89-8109-a52fc1e4f388",
+      "name": "Send WhatsApp Reply"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2020e6a3-53c5-4003-aac8-aa94343fc3b7",
+              "leftValue": "={{ $json.shouldTriggerSummary }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "49221e2f-f6e5-4335-b44b-16bc835550cb",
+              "leftValue": "={{ $json.needsImageStorage === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -192,
+        112
+      ],
+      "id": "f7a1a72f-00bc-4087-a571-0130485446fc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UPDATED: Prepare WhatsApp Summary - Now uses stored conversation history\n// Replace the existing \"Prepare WhatsApp Summary\" node with this code\n\nconsole.log('=== PREPARING WHATSAPP SUMMARY WITH FULL HISTORY ===');\n\nlet conversationContext = '';\nlet whatsappData = null;\n\ntry {\n  // Get the stored conversation history from the new memory node\n  const currentInput = $input.first().json;\n  \n  // Get WhatsApp data\n  whatsappData = {\n    chatInput: currentInput.chatInput || '',\n    senderPhone: currentInput.senderPhone || '',\n    senderName: currentInput.senderName || currentInput.extractedName || '',\n    sessionId: currentInput.sessionId || ''\n  };\n  \n  // Use the FULL conversation history that was stored\n  const fullHistory = currentInput.fullConversationHistory || '';\n  const exchanges = currentInput.conversationExchanges || [];\n  \n  if (fullHistory) {\n    console.log(`✅ Using stored conversation history with ${exchanges.length} exchanges`);\n    \n    conversationContext = `שיחת WhatsApp המלאה:\nמספר טלפון: ${whatsappData.senderPhone}\nשם: ${whatsappData.senderName || 'לא צוין'}\n\nהיסטוריית השיחה המלאה:\n${fullHistory}\n\nהוראות לסיכום: תחלץ מהשיחה המלאה הזאת:\n1. שם הלקוח (בדיוק כפי שהוזכר בשיחה)\n2. רעיון הקעקוע עם כל הפרטים שהוזכרו: גודל, מיקום, סגנון, תיאור מפורט\n3. כל פרט נוסף רלוונטי שהלקוח ציין לאורך השיחה`;\n    \n  } else {\n    // Fallback if no stored history (shouldn't happen with new node)\n    console.log('⚠️ No stored history, using current exchange only');\n    \n    conversationContext = `שיחת WhatsApp:\nמספר טלפון: ${whatsappData.senderPhone}\n\nהודעת הלקוח: ${currentInput.chatInput || ''}\n\nתגובת המערכת: ${currentInput.output || currentInput.response || ''}\n\nהוראות לסיכום: תחלץ מהשיחה:\n1. שם הלקוח\n2. רעיון הקעקוע עם כל הפרטים\n3. כל פרט נוסף רלוונטי`;\n  }\n  \n} catch (error) {\n  console.error('❌ Error preparing summary:', error.message);\n  conversationContext = 'שגיאה בהכנת נתוני הסיכום';\n}\n\nconsole.log('📋 Final conversation context length:', conversationContext.length);\n\nreturn {\n  conversationText: conversationContext,\n  sessionId: whatsappData?.sessionId || 'whatsapp_' + Date.now(),\n  timestamp: new Date().toISOString(),\n  platform: 'whatsapp',\n  phoneNumber: whatsappData?.senderPhone || ''\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -48
+      ],
+      "id": "4331c9dc-445f-4660-b762-292ff7b2f902",
+      "name": "Prepare WhatsApp Summary"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "chatModel": "gpt-4o",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "  המטרה שלך היא\n  1) לחלץ את השם המלא של הלקוח מהשיחה - בדיוק כפי שהוא הזכיר את עצמו\n  2) לסכם את הרעיון הקעקוע של הלקוח בדיוק מילולי וספציפי:\n     - גודל מדויק (אם צוין) - \"כגודל מטבע\", \"10 ס\"מ\", \"קטן\", \"גדול\"\n     - מיקום מדויק - \"על הזרוע הימנית\", \"מאחורי האוזן השמאלית\", \"על הכתף\"\n     - סטייל מדויק - \"ריאליזם\", \"מינימליסטי\", \"watercolor\", \"tribal\"\n     - צבעים ספציפיים - \"שחור לבן\", \"צבעוני\", \"כחול ואדום\"\n     - ציטוטים מדויקים - השתמש במירכאות לכל טקסט שהלקוח רוצה\n     - פרטים ספציפיים - \"עם עיניים כחולות\", \"בלי רקע\", \"עם כתובת\"\n\n  3) החזר JSON עם:\n  - name: שם הלקוח\n  - phone_number: מספר הטלפון מ-WhatsApp  \n  - idea_summary: סיכום של מקסימום 50 מילים עם כל הפרטים המדויקים\n  - has_image: true/false - האם נשלחה תמונה\n  - image_description: תיאור התמונה אם נשלחה (אחרת null)\n\n  למשל:\n  {\n    \"name\": \"דוד\",\n    \"phone_number\": \"+972501234567\", \n    \"idea_summary\": \"קעקוע אריה על הזרוע בסגנון ריאליזם - שלח תמונת השראה\",\n    \"has_image\": true,\n    \"image_description\": \"תמונת אריה מלך החיות עם רעמה מפוארת\"\n  }\n\n  רק JSON, בלי טקסט נוסף!"
+            },
+            {
+              "content": "={{$json.conversationText}}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 500,
+          "temperature": 0.1
+        },
+        "requestOptions": {}
+      },
+      "id": "904737a6-1d82-4418-9faf-b89ff9603768",
+      "name": "Summarize WhatsApp Chat",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        -48
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "7DtKXoDdZvRLt3w3",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Perfect MongoDB Preparation Node\n// Combines WhatsApp metadata from Code node + AI processing results\n\nconst inputData = $json;\n\n// Get WhatsApp metadata from Code node\nconst whatsappMetadata = {\n  senderPhone: inputData.senderPhone || null,\n  senderName: inputData.senderName || null,\n  senderJID: inputData.senderJID || null,\n  senderPhoneE164: inputData.senderPhoneE164 || null,\n  messageType: inputData.messageType || 'text',\n  timestamp: inputData.timestamp || new Date().toISOString()\n};\n\n// Extract AI processing results from message content\nlet aiResults = {\n  idea_summary: inputData.idea_summary || inputData.aiSummary || null,\n  real_name: inputData.real_name || inputData.extractedName || null\n};\n\n// Check if AI results are in message.content (JSON string)\nif (inputData.message && inputData.message.content) {\n  try {\n    // 🔧 SURGICAL FIX: Clean markdown from AI response before parsing\n    let aiContent = inputData.message.content;\n    if (typeof aiContent === 'string') {\n      aiContent = aiContent.replace(/```json\\s*\\n?/g, '').replace(/```\\s*\\n?/g, '').trim();\n      console.log('🧹 Cleaned AI content for parsing');\n    }\n    \n    const parsedAI = JSON.parse(aiContent);\n    aiResults = {\n      idea_summary: parsedAI.idea_summary || aiResults.idea_summary,\n      real_name: parsedAI.name || aiResults.real_name,\n      phone_number: parsedAI.phone_number || null\n    };\n    console.log('🤖 Extracted AI results:', aiResults);\n  } catch (e) {\n    console.log('⚠️ Could not parse AI message content:', e.message);\n  }\n}\n\n// Get image data (if available)\nconst imageData = {\n  has_images: inputData.has_images || inputData.hasImages || false,\n  images: inputData.images || null,\n  image_count: inputData.image_count || inputData.imageCount || 0,\n  last_image_upload: inputData.last_image_upload || (inputData.has_images ? new Date().toISOString() : null)\n};\n\n// Clean phone number for database (try AI results first, then WhatsApp metadata)\nconst cleanPhoneNumber = aiResults.phone_number || whatsappMetadata.senderPhone ? \n  (aiResults.phone_number || whatsappMetadata.senderPhone).toString().replace(/\\D/g, '') : null;\n\n// Create session ID\nconst sessionId = cleanPhoneNumber ? `whatsapp_${cleanPhoneNumber}` : null;\n\n// Prepare PERFECT MongoDB document with exact field names\nconst mongoDocument = {\n  // Core identity fields\n  name: aiResults.real_name || whatsappMetadata.senderName || null,\n  phone_number: cleanPhoneNumber,\n  \n  // Meeting/consultation fields\n  meeting_type: inputData.meeting_type || null,\n  idea_summary: aiResults.idea_summary,\n  ai_active: false,\n  \n  // Session tracking\n  session_id: sessionId,\n  conversation_length: inputData.conversation_length || 1,\n  \n  // Platform info\n  platform: \"whatsapp\",\n  \n  // Timestamps\n  timestamp: whatsappMetadata.timestamp,\n  created_at: new Date().toISOString(),\n  updated_at: new Date().toISOString(),\n  \n  // Error handling\n  error_details: inputData.error_details || null,\n  \n  // Raw data preservation\n  raw_response: JSON.stringify({\n    whatsapp: whatsappMetadata,\n    ai_results: aiResults,\n    original_input: inputData\n  }),\n  \n  // Image handling\n  images: imageData.images,\n  has_images: imageData.has_images,\n  image_count: imageData.image_count,\n  last_image_upload: imageData.last_image_upload\n};\n\n// Log the prepared document for debugging\nconsole.log('📋 Perfect MongoDB Document Prepared:', mongoDocument);\n\n// Validation checks\nconst validation = {\n  hasPhone: !!mongoDocument.phone_number && mongoDocument.phone_number.length >= 10,\n  hasSession: !!mongoDocument.session_id,\n  hasTimestamp: !!mongoDocument.timestamp,\n  isReady: true\n};\n\nconsole.log('✅ Validation Results:', validation);\n\nif (!validation.hasPhone) {\n  console.error('🚨 WARNING: No valid phone number for MongoDB!');\n}\n\n// Return perfect MongoDB-ready document\nreturn [{ json: mongoDocument }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        -48
+      ],
+      "id": "0cb5fea0-77eb-4e61-b976-f2167cd5098e",
+      "name": "Format WhatsApp Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple Response Node for non-summary cases\nreturn [{\n  json: {\n    output: $json.output,\n    response: $json.response, \n    text: $json.text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        128
+      ],
+      "id": "ed287935-03b2-4bd4-bdf5-487ea3aaf4a1",
+      "name": "Continue Chat"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        704,
+        256
+      ],
+      "id": "1cb7b03b-d6ca-442e-b050-7f5800bc0810",
+      "name": "Webhook Response"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "clients",
+        "updateKey": "phone_number",
+        "fields": "name,phone_number,meeting_type,idea_summary,ai_active,session_id,conversation_length,platform,timestamp,error_details,raw_response,created_at,updated_at,images,has_images,image_count,last_image_upload",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        -48
+      ],
+      "id": "27244d9d-a9fd-409f-a913-66bc8e5b2edd",
+      "name": "MongoDB",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "1WkBNfNUOsjMSbAf",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// NEW NODE: Deduplication Check\n// Place this AFTER the IF node (true branch), BEFORE \"Prepare WhatsApp Summary\"\n// This prevents duplicate summary creation\n\nconst sessionId = $json.sessionId;\nconst triggerReason = $json.triggerReason || '';\n\n// Check if we've already triggered a summary for this session recently\nconst staticData = $getWorkflowStaticData('global');\n\nif (!staticData.summaryTriggers) {\n  staticData.summaryTriggers = {};\n}\n\nconst now = Date.now();\nconst lastTriggerTime = staticData.summaryTriggers[sessionId] || 0;\nconst timeSinceLastTrigger = now - lastTriggerTime;\n\n// Prevent duplicate triggers within 30 seconds\nconst DUPLICATE_WINDOW = 30000; // 30 seconds\n\nif (timeSinceLastTrigger < DUPLICATE_WINDOW) {\n  console.log(`⚠️ Duplicate summary prevented for session ${sessionId}`);\n  console.log(`Last trigger: ${timeSinceLastTrigger}ms ago`);\n  \n  // Return empty to stop this branch\n  return [];\n}\n\n// Record this trigger\nstaticData.summaryTriggers[sessionId] = now;\n\nconsole.log(`✅ Summary allowed for session ${sessionId}`);\nconsole.log(`Trigger reason: ${triggerReason}`);\n\n// Pass through all data\nreturn [{\n  json: {\n    ...$json,\n    summaryTriggeredAt: new Date().toISOString(),\n    isDuplicatePrevented: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -48
+      ],
+      "id": "0de4f537-c91c-4fe3-8acf-9cc98d5ca4c0",
+      "name": "CHECK DUP"
+    },
+    {
+      "parameters": {
+        "collection": "clients",
+        "options": {},
+        "query": "={\n    \"phone_number\": \"{{$json.senderPhone.replace(/\\D/g, '')}}\"\n  }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -1888,
+        -240
+      ],
+      "id": "e7269761-abb2-4445-9535-faea318f3dab",
+      "name": "MongoDB1",
+      "credentials": {
+        "mongoDb": {
+          "id": "1WkBNfNUOsjMSbAf",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// FIXED: Check AI Active node with proper item pairing\n// Replace your existing \"check ai active\" node code with this:\n\n// Get MongoDB result - handle both array and single object\nconst mongoResult = $input.first().json;\nconst clientRecord = Array.isArray(mongoResult) ? mongoResult[0] : mongoResult;\n\n// Get original WhatsApp data with correct syntax\nconst whatsappData = $('Code').first().json;\n\nconsole.log('🔍 Checking AI status for:', whatsappData.senderPhone);\nconsole.log('📊 Client record found:', !!clientRecord);\nconsole.log('🤖 AI active status:', clientRecord?.ai_active);\n\n// Check if client exists and AI is disabled\nif (clientRecord && clientRecord.ai_active === false) {\n  console.log('🚫 AI is OFF - Human intervention mode');\n  \n  // Return with all required WhatsApp fields for sending\n  return [{\n    json: {\n      // CRITICAL: Include all fields needed by Send WhatsApp Reply\n      to: whatsappData.to,\n      senderPhone: whatsappData.senderPhone,\n      senderJID: whatsappData.senderJID,\n      sessionId: whatsappData.sessionId,\n      \n      // The automated response\n      output: \"היי! קיבלתי את ההודעה שלך. המקעקעת תחזור אליך בקרוב עם כל הפרטים! 🎨✨\",\n      text: \"היי! קיבלתי את ההודעה שלך. המקעקעת תחזור אליך בקרוב עם כל הפרטים! 🎨✨\",\n      \n      // Control flags\n      skipAI: true,\n      aiDisabled: true,\n      humanInterventionMode: true,\n      \n      // Original input for reference\n      chatInput: whatsappData.chatInput,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}\n\n// AI is active or no record yet (new conversation)\nconsole.log('✅ AI is active - continuing to AI Agent');\n\n// Return ALL WhatsApp data for normal flow\nreturn [{\n  json: {\n    ...whatsappData,\n    skipAI: false,\n    aiDisabled: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1744,
+        -256
+      ],
+      "id": "a879f44f-c22b-47dd-868b-819fb63283b5",
+      "name": "check ai active"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9396f049-25e0-4192-80f9-5916e7844bc0",
+              "leftValue": "={{$json.skipAI}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1584,
+        -272
+      ],
+      "id": "bb1d011d-0b97-45b6-847b-8a73157446a6",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_TOKEN_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $input.first().json.to }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1360,
+        -304
+      ],
+      "id": "7579c8ac-514c-47b1-a637-e76d5bf114bd",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "chatgpt-4o-latest"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -688,
+        288
+      ],
+      "id": "d2dd85ef-cdbb-4714-ba33-f0fd6bc24914",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "7DtKXoDdZvRLt3w3",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.wasenderapi.com/api/decrypt-media",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_TOKEN_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "data",
+              "value": "={{ $json.body.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1424,
+        -80
+      ],
+      "id": "bc482642-262e-4e5f-ab57-9252e279af9c",
+      "name": "decrypt image",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.publicUrl }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1280,
+        -80
+      ],
+      "id": "425e1b13-107d-4677-b2e3-dff38dc77de9",
+      "name": "download",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\n//======================\n\nconst webhookData = $json.body;\n\n// Check if we have the expected WhatsApp message structure\nif (!webhookData?.data?.messages) {\n  return [{\n    json: {\n      error: 'Invalid WhatsApp webhook data structure',\n      receivedData: webhookData\n    }\n  }];\n}\n\nconst message = webhookData.data.messages;\nconst key = message.key;\nconst messageContent = message.message;\n\n// Extract phone number and clean it\nconst remoteJid = key.remoteJid;\nconst phoneNumber = remoteJid.replace('@s.whatsapp.net', '');\n\n// Create session ID by removing non-digits from phone\nconst sessionId = 'whatsapp_' + phoneNumber.replace(/\\D/g, '');\n\n// Extract chat input (conversation text or caption)\nconst chatInput = messageContent?.conversation || \n                  messageContent?.extendedTextMessage?.text || \n                  messageContent?.imageMessage?.caption ||  // ← Image caption\n                  '';\n\n// Extract sender info\nconst senderPhone = phoneNumber;\nconst senderJID = remoteJid;\nconst senderPhoneE164 = '+' + phoneNumber;\n\n// ========== IMAGE DETECTION LOGIC ==========\n// Check for image in the message\nconst imageMessage = messageContent?.imageMessage;\nconst hasImage = !!imageMessage;\n\nlet mediaId = null;\nlet mediaUrl = null;\nlet mediaMimeType = null;\nlet mediaCaption = null;\nlet mediaSha256 = null;\nlet mediaFileLength = null;\n\nif (hasImage) {\n  // Extract image details when present\n  mediaId = imageMessage.mediaKey || imageMessage.id;\n  mediaUrl = imageMessage.url || imageMessage.directPath;\n  mediaMimeType = imageMessage.mimetype || 'image/jpeg';\n  mediaCaption = imageMessage.caption || '';\n  mediaSha256 = imageMessage.fileSha256;\n  mediaFileLength = imageMessage.fileLength;\n  \n  console.log('Image detected:', {\n    mediaId: mediaId,\n    mimeType: mediaMimeType,\n    caption: mediaCaption,\n    fileSize: mediaFileLength\n  });\n}\n\n// Determine message type\nconst messageType = hasImage ? 'image' : 'text';\n\n// ========== RETURN ALL FIELDS ==========\nreturn [{\n  json: {\n    // For HTTP Request node (original fields)\n    to: senderJID,\n    text: chatInput,\n    \n    // For Chat Trigger node (original fields)\n    chatInput: chatInput,        // ← This fixes \"No prompt specified\"\n    sessionId: sessionId,        // ← This fixes \"No session ID found\"\n    \n    // Additional data (original fields)\n    senderPhone: senderPhone, \n    senderJID: senderJID,\n    senderPhoneE164: senderPhoneE164,\n    messageType: messageType,     // ← Updated to be 'text' or 'image'\n    timestamp: new Date().toISOString(),\n    \n    // ========== NEW IMAGE-RELATED FIELDS ==========\n    hasImage: hasImage,           // ← Boolean flag for IF node\n    mediaId: mediaId,              // ← Media ID for downloading\n    mediaUrl: mediaUrl,            // ← Direct URL if available\n    mediaMimeType: mediaMimeType, // ← MIME type of media\n    mediaCaption: mediaCaption,    // ← Caption text with image\n    mediaSha256: mediaSha256,      // ← File hash for verification\n    mediaFileLength: mediaFileLength, // ← File size\n    \n    // Combined prompt for AI (includes caption if image)\n    fullPrompt: hasImage ? \n      `[User sent an image${mediaCaption ? ' with caption: ' + mediaCaption : ''}]` : \n      chatInput,\n    \n    // Original message content for reference\n    originalMessageContent: messageContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        144
+      ],
+      "id": "8dd994ed-f0f6-4d28-8edc-65e5e54cfabd",
+      "name": "Code",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b909faee-3390-4d78-a0eb-3f40ef2904d5",
+              "leftValue": "={{ JSON.stringify($json).includes('image') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1600,
+        128
+      ],
+      "id": "51166f00-7500-4e6d-9089-8ef367fb056a",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput || \"Analyze this image for tattoo consultation\" }}",
+        "options": {
+          "systemMessage": "\n⚡ פרומפט מעודכן לסוכן AI עבור מקעקעת (ריאליזם ופיין-ליין) - WhatsApp\n\nאתה עוזר אישי של מקעקעת שמתמחה בקעקועים בסגנון ריאליזם ופיין־ליין.\nהסגנון שלך קצר, ברור, נעים ולא רשמי — כאילו אתה עוזר אמיתי בסטודיו שזורם עם לקוחות ב-WhatsApp.\nאתה לא מקעקע, אבל מכיר טוב את הסגנון שלה, את התהליך, ואת איך היא עובדת.\nבלי טקסטים ארוכים, בלי מילים גבוהות, בלי דיבור רובוטי.\nהשיח זורם, חיובי ואנושי — אבל תמיד מעביר את המידע בצורה ברורה ונעימה.\n\nשם הלקוח (אם זמין): {{ $json.senderName }}\nמספר טלפון: {{ $json.senderPhone }}\n\n🧠 כללי תגובה:\n\n🚀 אם השיחה רק התחילה (למשל \"היי\", \"מה קורה\"):\n\"היי! איך אפשר לעזור? יש לך רעיון לקעקוע או שתרצה להתחיל מייעוץ עם המקעקעת? 😊\"\n\n💬 אם נשלח רעיון (גם אם חלקי או בלי גודל/מיקום/תמונה) - **חובה לבקש שם תמיד קודם כל**:\n\"סבבה! הרעיון נשמע מעניין 🙂\nקודם כל - איך קוראים לך? תשלח לי בבקשה את השם המלא שלך.\"\n\n**אחרי קבלת השם** - בדוק מה חסר ובקש:\n- אם חסר גודל: \"איזה גודל בערך חשבת? (קטן/בינוני/גדול או בס״מ)\"\n- אם חסר מיקום: \"איפה חשבת למקם את זה?\"\n- אם חסר שניהם: \"איזה גודל בערך חשבת ואיפה למקם את זה?\"\n\nאם הלקוח לא עונה עם שם:\n\"כדי שנוכל להמשיך ולעזור לך, חשוב שנקבל את השם המלא שלך 🙂\"\n(אם אין תגובה גם אחרי זמן מה)\n\"רק מזכיר שבלי השם המלא לא נוכל להתקדם – תוכל לשלוח אותו?\"\n(הבקשה לשם היא חובה בכל מצב אחרי קבלת רעיון, עד שיתקבל שם)\n\n📍 אם חסר מידע נוסף (אחרי שכבר יש שם, גודל ומיקום):\n\"אם יש תמונה להשראה – תשלח 🙂 ואם לא, אפשר גם לתאר במילים.\"\n\n🎨 אם הסגנון לא תואם (למשל: מנגה, גרפיטי, דיסני):\n\"נשמע מעניין! רק חשוב לדעת – היא מתמקדת בעיקר בריאליזם ופיין-ליין, אז קעקועים מצוירים או גרפיים פחות הסגנון שלה.\nאולי נוכל לחשוב על גרסה יותר עדינה או ריאליסטית של ההשראה שלך.\nתשלח תמונה ונראה אם זה יכול להתאים 🙂\nאגב – איך קוראים לך? תשלח את השם המלא שלך כדי שנוכל להמשיך.\"\n**ואז גם:** \"איזה גודל בערך חשבת ואיפה למקם את זה?\"\n\n💸 אם שואלים לגבי מחיר:\n\"קשה לדעת מחיר בלי להבין גודל, מיקום וסגנון 🎯\nהכי טוב להגיע לייעוץ – שם יתאימו לך הצעת מחיר לפי הרעיון.\"\n\n📅 אם מבקשים לקבוע פגישה / ייעוץ:\n\"אני לא קובע פגישות 🙂 אבל תשלח לי את השם המלא שלך ואעביר למקעקעת בקשה לייעוץ - היא תחזור אליך לתיאום.\nאם יש תמונה או רעיון – תצרף!\"\n\n✅ **כשיש שם + רעיון + גודל + מיקום - סיום השיחה:**\n\"מושלם [שם]! אעביר למקעקעת את הפרטים שלך ונחזור אליך בהקדם. תודה! 🙏\"\n\n**תזכורת חשובה - סדר חובה אחרי רעיון:**\n1. **שם מלא** - חובה ראשונה\n2. **גודל** \n3. **מיקום**\n4. **סיום עם תודה**"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -688,
+        128
+      ],
+      "id": "120a8b12-6f0f-4bc8-8ece-7975db74a8ff",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "clients",
+        "updateKey": "=phone_number",
+        "fields": "={\n  \"$push\": {\n    \"images\": {\n      \"url\": \"{{ $json.publicUrl }}\",\n      \"analysis\": \"{{ $json.output }}\",\n      \"timestamp\": \"{{ new Date().toISOString() }}\"\n    }\n  },\n  \"$set\": {\n    \"has_images\": true,\n    \"last_image_upload\": \"{{ new Date().toISOString() }}\"\n  },\n  \"$inc\": {\n    \"image_count\": 1\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        -176
+      ],
+      "id": "2474aeed-5647-449f-8e39-12a1b655a6b1",
+      "name": "image db",
+      "credentials": {
+        "mongoDb": {
+          "id": "1WkBNfNUOsjMSbAf",
+          "name": "MongoDB account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// NEW NODE: Store Conversation Memory\n// Place this AFTER \"Process AI Response\" node, BEFORE the IF node\n// This stores the full conversation in a way that's accessible later\n\nconst aiResponse = $json.output || $json.response || $json.text || '';\nlet whatsappData;\ntry {\n    // For text messages - reference the Code node\n    whatsappData = $node[\"Code\"].json;\n} catch (error) {\n    // For images - use input data or find alternative source\n    whatsappData = $input.first().json;\n}\nconst sessionId = whatsappData.sessionId;\n\n// Store the current exchange\nconst currentExchange = {\n  user: whatsappData.chatInput,\n  assistant: aiResponse,\n  timestamp: new Date().toISOString()\n};\n\n// Get or initialize conversation history\nlet conversationHistory = [];\n\n// Try to get existing history from workflow static data\ntry {\n  const staticData = $getWorkflowStaticData('global');\n  if (!staticData.conversations) {\n    staticData.conversations = {};\n  }\n  \n  if (staticData.conversations[sessionId]) {\n    conversationHistory = staticData.conversations[sessionId];\n  }\n  \n  // Add current exchange\n  conversationHistory.push(currentExchange);\n  \n  // Store updated history\n  staticData.conversations[sessionId] = conversationHistory;\n  \n  console.log(`📝 Stored conversation for session ${sessionId}, total exchanges: ${conversationHistory.length}`);\n  \n} catch (error) {\n  console.error('Failed to store conversation:', error);\n  conversationHistory = [currentExchange];\n}\n\n// Build full conversation text\nconst fullConversation = conversationHistory.map(exchange => \n  `לקוח: ${exchange.user}\\nמערכת: ${exchange.assistant}`\n).join('\\n\\n');\n\n// Pass through all original data + add conversation history\nreturn [{\n  json: {\n    ...$json,\n    fullConversationHistory: fullConversation,\n    conversationExchanges: conversationHistory,\n    totalExchanges: conversationHistory.length,\n    sessionId: sessionId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        112
+      ],
+      "id": "968c2bd9-4bef-41c3-b3ff-a3ff18c412cf",
+      "name": "CONVO"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput || \"Analyze this image for tattoo consultation\" }}",
+        "options": {
+          "systemMessage": "\n⚡ פרומפט מעודכן לסוכן AI עבור מקעקעת (ריאליזם ופיין-ליין) - WhatsApp\n\nאתה עוזר אישי של מקעקעת שמתמחה בקעקועים בסגנון ריאליזם ופיין־ליין.\nהסגנון שלך קצר, ברור, נעים ולא רשמי — כאילו אתה עוזר אמיתי בסטודיו שזורם עם לקוחות ב-WhatsApp.\nאתה לא מקעקע, אבל מכיר טוב את הסגנון שלה, את התהליך, ואת איך היא עובדת.\nבלי טקסטים ארוכים, בלי מילים גבוהות, בלי דיבור רובוטי.\nהשיח זורם, חיובי ואנושי — אבל תמיד מעביר את המידע בצורה ברורה ונעימה.\n\nשם הלקוח (אם זמין): {{ $json.senderName }}\nמספר טלפון: {{ $json.senderPhone }}\n\n🧠 כללי תגובה:\n\n🚀 אם השיחה רק התחילה (למשל \"היי\", \"מה קורה\"):\n\"היי! איך אפשר לעזור? יש לך רעיון לקעקוע או שתרצה להתחיל מייעוץ עם המקעקעת? 😊\"\n\n💬 אם נשלח רעיון (גם אם חלקי או בלי גודל/מיקום/תמונה) - **חובה לבקש שם תמיד קודם כל**:\n\"סבבה! הרעיון נשמע מעניין 🙂\nקודם כל - איך קוראים לך? תשלח לי בבקשה את השם המלא שלך.\"\n\n**אחרי קבלת השם** - בדוק מה חסר ובקש:\n- אם חסר גודל: \"איזה גודל בערך חשבת? (קטן/בינוני/גדול או בס״מ)\"\n- אם חסר מיקום: \"איפה חשבת למקם את זה?\"\n- אם חסר שניהם: \"איזה גודל בערך חשבת ואיפה למקם את זה?\"\n\nאם הלקוח לא עונה עם שם:\n\"כדי שנוכל להמשיך ולעזור לך, חשוב שנקבל את השם המלא שלך 🙂\"\n(אם אין תגובה גם אחרי זמן מה)\n\"רק מזכיר שבלי השם המלא לא נוכל להתקדם – תוכל לשלוח אותו?\"\n(הבקשה לשם היא חובה בכל מצב אחרי קבלת רעיון, עד שיתקבל שם)\n\n📍 אם חסר מידע נוסף (אחרי שכבר יש שם, גודל ומיקום):\n\"אם יש תמונה להשראה – תשלח 🙂 ואם לא, אפשר גם לתאר במילים.\"\n\n🎨 אם הסגנון לא תואם (למשל: מנגה, גרפיטי, דיסני):\n\"נשמע מעניין! רק חשוב לדעת – היא מתמקדת בעיקר בריאליזם ופיין-ליין, אז קעקועים מצוירים או גרפיים פחות הסגנון שלה.\nאולי נוכל לחשוב על גרסה יותר עדינה או ריאליסטית של ההשראה שלך.\nתשלח תמונה ונראה אם זה יכול להתאים 🙂\nאגב – איך קוראים לך? תשלח את השם המלא שלך כדי שנוכל להמשיך.\"\n**ואז גם:** \"איזה גודל בערך חשבת ואיפה למקם את זה?\"\n\n💸 אם שואלים לגבי מחיר:\n\"קשה לדעת מחיר בלי להבין גודל, מיקום וסגנון 🎯\nהכי טוב להגיע לייעוץ – שם יתאימו לך הצעת מחיר לפי הרעיון.\"\n\n📅 אם מבקשים לקבוע פגישה / ייעוץ:\n\"אני לא קובע פגישות 🙂 אבל תשלח לי את השם המלא שלך ואעביר למקעקעת בקשה לייעוץ - היא תחזור אליך לתיאום.\nאם יש תמונה או רעיון – תצרף!\"\n\n✅ **כשיש שם + רעיון + גודל + מיקום - סיום השיחה:**\n\"מושלם [שם]! אעביר למקעקעת את הפרטים שלך ונחזור אליך בהקדם. תודה! 🙏\"\n\n**תזכורת חשובה - סדר חובה אחרי רעיון:**\n1. **שם מלא** - חובה ראשונה\n2. **גודל** \n3. **מיקום**\n4. **סיום עם תודה**",
+          "passthroughBinaryImages": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -832,
+        -128
+      ],
+      "id": "7be98e97-2254-4f2b-8643-fc0e74217264",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -832,
+        32
+      ],
+      "id": "406b82ed-8f2d-46b1-a6ee-39804a2ceee2",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "7DtKXoDdZvRLt3w3",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.wasenderapi.com/api/send-message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_TOKEN_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $node[\"WhatsApp Webhook Receiver\"].json.body.data.messages.key.remoteJid.split('@')[0] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -512,
+        -128
+      ],
+      "id": "180d60e2-2c3b-48b6-bba7-b930b0345d8e",
+      "name": "Send WhatsApp Reply1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "sessionId"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        32
+      ],
+      "id": "f25c4206-f0e0-45a7-bb4d-9a1798026dcb",
+      "name": "Agent Memory1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Agent Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Response": {
+      "main": [
+        [
+          {
+            "node": "CONVO",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "CHECK DUP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Continue Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare WhatsApp Summary": {
+      "main": [
+        [
+          {
+            "node": "Summarize WhatsApp Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize WhatsApp Chat": {
+      "main": [
+        [
+          {
+            "node": "Format WhatsApp Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format WhatsApp Data": {
+      "main": [
+        [
+          {
+            "node": "MongoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Webhook Receiver": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue Chat": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reply": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECK DUP": {
+      "main": [
+        [
+          {
+            "node": "Prepare WhatsApp Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB1": {
+      "main": [
+        [
+          {
+            "node": "check ai active",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check ai active": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "decrypt image": {
+      "main": [
+        [
+          {
+            "node": "download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download": {
+      "main": [
+        [
+          {
+            "node": "image db",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "decrypt image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Process AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONVO": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reply1": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "image db": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c6cac905-3a70-4209-8118-c660ad7798c3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1b5f87bed6468057f1ced7fd3c544ef749b4fdbb81098b088df9505e49ef208a"
+  },
+  "id": "UXWLXNkcEPbLMTO7",
+  "tags": [
+    {
+      "createdAt": "2025-08-11T11:03:12.782Z",
+      "updatedAt": "2025-08-11T11:03:12.782Z",
+      "id": "fxnG4IaUnFjYhCf6",
+      "name": "whatsapp-ai"
+    },
+    {
+      "createdAt": "2025-08-11T11:03:12.819Z",
+      "updatedAt": "2025-08-11T11:03:12.819Z",
+      "id": "u6GyntPyho5GOGBq",
+      "name": "wasender-api"
+    }
+  ]
+}
